@@ -8,8 +8,8 @@
 .env
 
 # Configuración local de TypeScript
-/tsconfig.json
-/tsconfig.*.json
+#/tsconfig.json
+#/tsconfig.*.json
 
 # Archivos generados por el IDE
 .vscode/
