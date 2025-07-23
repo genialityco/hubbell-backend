@@ -29,3 +29,4 @@ npm-debug.log*
 
 # Archivos de desarrollo local
 *.local
+.vercel
