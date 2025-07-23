@@ -1,0 +1,31 @@
+# Dependencias de Node
+/node_modules
+/package-lock.json
+
+# Archivos de entorno (variables sensibles)
+/env/*
+!.env.example  # Excepción: archivo de ejemplo opcional
+.env
+
+# Configuración local de TypeScript
+/tsconfig.json
+/tsconfig.*.json
+
+# Archivos generados por el IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs y archivos temporales
+*.log
+*.tmp
+npm-debug.log*
+
+# Carpetas de compilación (si usas TypeScript)
+/dist/
+/build/
+
+# Archivos de desarrollo local
+*.local
