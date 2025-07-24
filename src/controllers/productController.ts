@@ -20,6 +20,32 @@ export const createProduct = async (req: Request, res: Response) => {
   }
 };
 
+// Busca productos por query y categorías seleccionadas
+export const searchProducts = async (req: Request, res: Response) => {
+  try {
+    const { query = "", categories = [] } = req.body;
+    const categoriesArr = Array.isArray(categories) ? categories : [categories];
+    // Construir el filtro dinámico
+    const filter: any = {};
+
+    if (query) {
+      filter.$or = [
+        { name: { $regex: query, $options: "i" } },
+        { code: { $regex: query, $options: "i" } },
+        { brand: { $regex: query, $options: "i" } },
+      ];
+    }
+    if (categoriesArr.length > 0) {
+      filter.type = { $in: categoriesArr };
+    }
+
+    const products = await Product.find(filter);
+    res.json({ products, total: products.length });
+  } catch (err) {
+    res.status(500).json({ message: "Error en búsqueda", error: err });
+  }
+};
+
 // Listar todos los productos
 export const getProducts = async (req: Request, res: Response) => {
   try {
