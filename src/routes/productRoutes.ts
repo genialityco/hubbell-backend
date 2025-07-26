@@ -2,7 +2,7 @@
 import { Router } from "express";
 import {
   createProduct,
-  getProductByCode,
+  getProductByCodeQuery,
   getCompatibles,
   getProducts,
   searchProducts,
@@ -13,7 +13,7 @@ const router = Router();
 router.post("/", createProduct);
 router.post("/search", searchProducts);
 router.get("/", getProducts);
-router.get("/:code", getProductByCode);
+router.get("/code", getProductByCodeQuery);
 router.get("/:code/compatibles", getCompatibles);
 
 export default router;
