@@ -6,6 +6,7 @@ import {
   getCompatibles,
   getProducts,
   searchProducts,
+  updateProductCompatibles,
 } from "../controllers/productController";
 
 const router = Router();
@@ -15,5 +16,7 @@ router.post("/search", searchProducts);
 router.get("/", getProducts);
 router.get("/code", getProductByCodeQuery);
 router.get("/:code/compatibles", getCompatibles);
+router.patch("/code/:code/compatibles", updateProductCompatibles);
+
 
 export default router;

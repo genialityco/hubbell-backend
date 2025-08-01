@@ -21,12 +21,12 @@ export const createProduct = async (req: Request, res: Response) => {
 };
 
 // Busca productos por query y categorías seleccionadas y devuelve filtros tipo
+// Busca productos con paginación
 export const searchProducts = async (req: Request, res: Response) => {
   try {
-    const { query = "", categories = [] } = req.body;
+    const { query = "", categories = [], page = 1, limit = 20 } = req.body;
     const categoriesArr = Array.isArray(categories) ? categories : [categories];
 
-    // Filtro para productos a mostrar
     const filter: any = {};
     if (query) {
       filter.$or = [
@@ -39,44 +39,36 @@ export const searchProducts = async (req: Request, res: Response) => {
       filter.type = { $in: categoriesArr };
     }
 
-    // Productos filtrados a mostrar
-    const products = await Product.find(filter);
+    const skip = (Number(page) - 1) * Number(limit);
 
-    // Filtros (types) globales o por búsqueda
-    let filters: { types: { name: string; count: number }[] } = { types: [] };
+    const [products, total] = await Promise.all([
+      Product.find(filter).skip(skip).limit(Number(limit)),
+      Product.countDocuments(filter),
+    ]);
 
-    if (query) {
-      // Si hay query, solo los tipos que aparecen en los productos filtrados
-      const typesInResults = await Product.distinct("type", filter);
-      const typeCounts: Record<string, number> = {};
-      typesInResults.forEach((type) => {
-        typeCounts[type || "Sin tipo"] = 0;
+    // Construir filtros (idéntico a antes)
+    const typeCounts: Record<string, number> = {};
+    const typesInResults = await Product.distinct("type", query ? filter : {});
+    for (const type of typesInResults) {
+      typeCounts[type || "Sin tipo"] = await Product.countDocuments({
+        ...filter,
+        type,
       });
-      products.forEach((prod) => {
-        const type = prod.type || "Sin tipo";
-        typeCounts[type] = (typeCounts[type] || 0) + 1;
-      });
-      filters.types = typesInResults.map((type) => ({
-        name: type || "Sin tipo",
-        count: typeCounts[type || "Sin tipo"] || 0,
-      }));
-    } else {
-      // Si NO hay query, cuenta los tipos globales en TODO el catálogo
-      const allTypes = await Product.distinct("type");
-      const typeCounts: Record<string, number> = {};
-      for (const type of allTypes) {
-        typeCounts[type || "Sin tipo"] = await Product.countDocuments({ type });
-      }
-      filters.types = allTypes.map((type) => ({
-        name: type || "Sin tipo",
-        count: typeCounts[type || "Sin tipo"] || 0,
-      }));
     }
+
+    const filters = {
+      types: typesInResults.map((type) => ({
+        name: type || "Sin tipo",
+        count: typeCounts[type || "Sin tipo"] || 0,
+      })),
+    };
 
     res.json({
       products,
       filters,
-      total: products.length,
+      total,
+      totalPages: Math.ceil(total / Number(limit)),
+      currentPage: Number(page),
     });
   } catch (err) {
     res.status(500).json({ message: "Error en búsqueda", error: err });
@@ -130,4 +122,22 @@ export const getCompatibles = async (req: Request, res: Response) => {
     code: { $in: product.compatibles },
   });
   res.json(compatibles);
+};
+
+export const updateProductCompatibles = async (req: Request, res: Response) => {
+  try {
+    const code = req.params.code;
+    const { compatibles } = req.body; // [{ code, type }, ...]
+    const updated = await Product.findOneAndUpdate(
+      { code },
+      { compatibles },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ message: "No encontrado" });
+    res.json(updated);
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Error actualizando compatibles", error: err });
+  }
 };
