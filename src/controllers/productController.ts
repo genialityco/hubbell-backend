@@ -1,6 +1,7 @@
 // src/controllers/productController.ts
 import { Request, Response } from "express";
 import Product, { IProduct } from "../models/Product";
+import { escapeRegex } from "../helpers/escapeRegex";
 
 // Crear producto (con compatibles)
 export const createProduct = async (req: Request, res: Response) => {
@@ -41,12 +42,13 @@ export const searchProducts = async (req: Request, res: Response) => {
 
     const skip = (Number(page) - 1) * Number(limit);
 
+    // --- BÚSQUEDA BASE CON PAGINADO ---
     const [products, total] = await Promise.all([
       Product.find(filter).skip(skip).limit(Number(limit)),
       Product.countDocuments(filter),
     ]);
 
-    // Construir filtros (idéntico a antes)
+    // --- FILTROS (como tenías) ---
     const typeCounts: Record<string, number> = {};
     const typesInResults = await Product.distinct("type", query ? filter : {});
     for (const type of typesInResults) {
@@ -55,7 +57,6 @@ export const searchProducts = async (req: Request, res: Response) => {
         type,
       });
     }
-
     const filters = {
       types: typesInResults.map((type) => ({
         name: type || "Sin tipo",
@@ -63,12 +64,54 @@ export const searchProducts = async (req: Request, res: Response) => {
       })),
     };
 
+    // --- NUEVO: DETECCIÓN DE CÓDIGO Y COMPATIBLES ---
+    const trimmed = String(query).trim();
+    let matchedProduct = null as any;
+    let compatibleProducts: any[] = [];
+
+    if (trimmed) {
+      // Match exacto por código (case-insensitive)
+      matchedProduct =
+        (await Product.findOne({ code: trimmed })) ||
+        (await Product.findOne({
+          code: { $regex: `^${escapeRegex(trimmed)}$`, $options: "i" },
+        }));
+
+      if (matchedProduct) {
+        // 1) Compatibles directos (los que el producto declara)
+        const directCodes = (matchedProduct.compatibles || []).map(
+          (c: any) => c.code
+        );
+        const directProducts =
+          directCodes.length > 0
+            ? await Product.find({ code: { $in: directCodes } })
+            : [];
+
+        // 2) Compatibles inversos (otros productos que listan a matchedProduct como compatible)
+        const inverseProducts = await Product.find({
+          "compatibles.code": matchedProduct.code,
+        });
+
+        // Unir y deduplicar
+        const map = new Map<string, any>();
+        for (const p of [...directProducts, ...inverseProducts]) {
+          if (!map.has(p.code) && p.code !== matchedProduct.code) {
+            map.set(p.code, p);
+          }
+        }
+        compatibleProducts = Array.from(map.values());
+      }
+    }
+
     res.json({
       products,
       filters,
       total,
       totalPages: Math.ceil(total / Number(limit)),
       currentPage: Number(page),
+      // 👇 nuevo
+      matchedProduct,
+      compatibleProducts,
     });
   } catch (err) {
     res.status(500).json({ message: "Error en búsqueda", error: err });
